@@ -1,0 +1,71 @@
+%=============================================
+\section{Results, Evaluation, and Future Scope}
+%=============================================
+
+\subsection{Performance Metrics and Latency}
+
+A critical requirement for live sports commentary is low latency. Table~\ref{tab:latency} summarizes the measured latency across different stages of the data pipeline.
+
+\begin{table}[H]
+\centering
+\caption{End-to-End Pipeline Latency Measurements}
+\label{tab:latency}
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Pipeline Stage} & \textbf{Observed Latency (ms)} \\
+\midrule
+Browser Event $\rightarrow$ WebSocket $\rightarrow$ Kafka & $<$ 10 \\
+Kafka $\rightarrow$ Flink Processing & 50 -- 200 \\
+Flink Analysis $\rightarrow$ Commentary Generation & 10 -- 50 \\
+Commentary $\rightarrow$ WebSocket Broadcast & $<$ 20 \\
+\midrule
+TTS Neural Synthesis (CPU) & 2000 -- 5000 \\
+TTS Neural Synthesis (GPU - Estimated) & 500 -- 1000 \\
+\midrule
+\textbf{Text Commentary (End-to-End)} & \textbf{80 -- 280} \\
+\textbf{Voice Commentary (CPU)} & \textbf{2100 -- 5300} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The core analytical pipeline (excluding voice synthesis) consistently achieves sub-300ms latency. This means text commentary appears on the dashboard almost instantaneously after a shot is played in the simulator. The neural TTS synthesis, running on CPU in the Docker container, represents the primary bottleneck, taking 2 to 5 seconds to generate a sentence. However, this delay is acceptable for sports broadcasting, mimicking the natural reaction time of a human commentator.
+
+\subsection{Resource Utilization}
+
+The system demonstrates efficient resource utilization for a local deployment, though the TTS engine demands significant memory.
+
+\begin{table}[H]
+\centering
+\caption{Docker Container Resource Allocation and Usage}
+\label{tab:resources}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Container / Service} & \textbf{CPU Usage (\%)} & \textbf{RAM Allocation (MB)} \\
+\midrule
+Kafka + Zookeeper & 5 -- 15 & $\sim$ 800 \\
+Flink (JobManager + TaskManager) & 10 -- 25 & 3600 \\
+Backend API (Node.js) & 3 -- 8 & $\sim$ 150 \\
+TTS Service (Python / PyTorch) & 40 -- 90 (during inference) & 4096 \\
+Frontend (Nginx) & $<$ 1 & $\sim$ 20 \\
+\midrule
+\textbf{Total System Footprint} & \textbf{Variable} & \textbf{$\sim$ 8.6 GB} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Conclusion}
+
+This project successfully designed, implemented, and containerized a real-time AI cricket commentary system. It validates the integration of distributed streaming technologies (Kafka, Flink) with modern AI voice cloning (XTTS-v2) and real-time web technologies (WebSocket, React). The system reliably processes streaming game events, applies parallel analytical logic, and delivers emotion-aware, cloned-voice commentary with sub-second text latency. It serves as a comprehensive reference architecture for building scalable, real-time analytics and AI broadcasting applications.
+
+\subsection{Future Scope}
+
+The architecture is highly extensible. Several enhancements are proposed for future iterations:
+
+\begin{enumerate}
+\item \textbf{GPU-Accelerated Inference}: Deploying the \texttt{tts-service} with NVIDIA Container Toolkit to utilize CUDA acceleration, which would reduce audio generation latency from 5 seconds to under 1 second.
+\item \textbf{LLM Integration}: Replacing the template-based commentary engine with a fine-tuned Large Language Model (e.g., LLaMA-3) to generate dynamic, unscripted narratives based on the Flink context.
+\item \textbf{Computer Vision Ingestion}: Replacing the React simulator with a computer vision module that ingests real-world live video feeds, tracks the ball and players, and emits Kafka events automatically.
+\item \textbf{Cloud-Native Deployment}: Migrating from local Docker Compose to a Kubernetes cluster on AWS or GCP, utilizing managed services like Confluent Cloud for Kafka and Amazon EKS for auto-scaling Flink task managers.
+\item \textbf{Multi-Language Support}: Utilizing XTTS-v2's multilingual capabilities to provide instant translation and commentary delivery in regional languages (e.g., Hindi, Tamil) from the same underlying event stream.
+\item \textbf{Advanced Machine Learning Models}: Replacing the Bayesian win predictor with a trained LSTM or Transformer model that has ingested years of historical cricket scorecard data.
+\end{enumerate}

@@ -1,0 +1,87 @@
+%=============================================
+\section{Implementation and Integration}
+%=============================================
+
+\subsection{Docker Containerization}
+
+The entire system is orchestrated using Docker Compose. This ensures environment consistency, simplifies deployment, and allows for precise resource allocation. The project runs nine distinct containers within a custom bridged network.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{docker_architecture_1777743798253.png}
+\caption{Docker Compose container orchestration showing port mappings and dependencies}
+\label{fig:docker}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Docker Service Configuration}
+\label{tab:docker}
+\begin{tabular}{@{}llp{5cm}@{}}
+\toprule
+\textbf{Service} & \textbf{Ports} & \textbf{Purpose / Configuration} \\
+\midrule
+\texttt{zookeeper} & 2181 & Kafka coordination. \\
+\texttt{kafka} & 9092, 29092 & Message broker. Depends on Zookeeper. \\
+\texttt{kafka-init} & -- & Ephemeral container that creates the three required topics on startup. \\
+\texttt{jobmanager} & 8081 & Flink master node. \\
+\texttt{taskmanager} & -- & Flink worker node. Allocated 2GB RAM. \\
+\texttt{flink-job-submit} & -- & Compiles (Maven) and submits the Java JAR to the JobManager. \\
+\texttt{backend-api} & 3001 & Node.js Express/WebSocket server. \\
+\texttt{tts-service} & 5001 & Python Flask API. Allocated 4GB RAM for PyTorch/XTTS inference. \\
+\texttt{frontend-ui} & 3000 & Nginx serving the compiled React Vite application. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Docker health checks are heavily utilized to ensure services start in the correct order (e.g., Flink job submission waits until Kafka topics exist). Multi-stage Dockerfiles are used for the Flink processor and Frontend to minimize the final production image sizes.
+
+\subsection{Frontend Dashboard Implementation}
+
+The user interface is built with React 18 and Vite 5. It is designed as a dark-themed, responsive dashboard utilizing modern glassmorphism UI principles.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{frontend_component_tree_1777743959998.png}
+\caption{React component hierarchy and data propagation}
+\label{fig:components}
+\end{figure}
+
+The UI is divided into two main sections. The top section houses the \texttt{CricketGame} component, rendering the HTML5 Canvas simulator.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{frontend_cricket_field.jpg}
+\caption{Live interactive cricket match interface with Canvas-based field visualization}
+\label{fig:ui1}
+\end{figure}
+
+The lower section forms the analytics dashboard, featuring:
+\begin{itemize}
+\item \textbf{Commentary Feed}: An auto-scrolling list of commentary lines, color-coded by emotion tags.
+\item \textbf{Player Stats}: Real-time metrics including runs, balls faced, boundary counts, and dynamically calculated strike rate.
+\item \textbf{Win Prediction}: Animated progress bars showing the Flink-calculated win probability.
+\item \textbf{Event Timeline}: A historical log of all game events.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{frontend_dashboard.jpg}
+\caption{Analytics dashboard showing live commentary, match stats, and win probability}
+\label{fig:ui2}
+\end{figure}
+
+\subsection{Text-to-Speech Integration}
+
+The voice synthesis capability elevates the project from a text dashboard to a broadcasting tool. The \texttt{tts-service} is a Python application built with Flask and the Coqui TTS library.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{tts_voice_pipeline_1777743843494.png}
+\caption{TTS voice synthesis pipeline from text generation to browser audio playback}
+\label{fig:tts}
+\end{figure}
+
+The engine utilizes XTTS-v2. Upon receiving a commentary string, the model references a pre-provided 15-second WAV file of a professional sports commentator. It computes speaker embeddings to capture the tonal characteristics, accent, and pitch of the reference voice. It then performs neural synthesis to generate a new audio file reading the text in that cloned voice. 
+
+To ensure stability, generation parameters are tuned: \texttt{speed} is set to 1.1 for an energetic, fast-paced sports delivery, and \texttt{temperature} is set to 0.65 to balance vocal expressiveness with acoustic stability. The resulting WAV audio is Base64 encoded, returned to the backend, and forwarded via WebSocket to the React app, where the Web Audio API (\texttt{AudioContext}) queues and plays it seamlessly.

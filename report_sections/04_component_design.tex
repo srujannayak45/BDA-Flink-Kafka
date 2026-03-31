@@ -1,0 +1,127 @@
+%=============================================
+\section{Component Design and Implementation}
+%=============================================
+
+\subsection{Apache Kafka Event Streaming}
+
+Kafka acts as the central data hub. It is configured with three topics, each with 3 partitions and a replication factor of 1 (due to the single-broker local deployment).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{kafka_event_flow_1777743860188.png}
+\caption{Kafka topic architecture showing producers, consumers, and data schemas}
+\label{fig:kafka}
+\end{figure}
+
+\begin{itemize}
+\item \textbf{game-events}: Stores raw game events (runs, wickets, dot balls) keyed by \texttt{player\_id}. This guarantees that all events for a specific player are routed to the same partition, ensuring ordered processing by Flink.
+\item \textbf{commentary}: Stores processed commentary objects originating from the Flink processors.
+\item \textbf{game-stats}: Maintains aggregated player statistics for dashboard display and historical tracking.
+\end{itemize}
+
+Each game event is serialized as a JSON object:
+\begin{lstlisting}[language=Java,caption={Game Event JSON Schema}]
+{
+  "match_id": "match_1714600000000",
+  "player_id": "batsman_1",
+  "player_name": "Srujan",
+  "action": "runs",
+  "timestamp": 1714600001234,
+  "game_tick": 42,
+  "details": {
+    "runs": 6,
+    "timing": "perfect",
+    "score": 85,
+    "wickets": 3,
+    "overs": "7.2"
+  }
+}
+\end{lstlisting}
+
+\subsection{Apache Flink Stream Processing}
+
+The core analytical intelligence resides in the Apache Flink job, written in Java using the DataStream API. Flink reads from Kafka, deserializes the JSON, applies watermarks for out-of-order event handling, and then keys the stream by \texttt{player\_id}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{flink_processing_1777743825933.png}
+\caption{Apache Flink stream processing pipeline detailing the five parallel analyzers}
+\label{fig:flinkpipeline}
+\end{figure}
+
+The keyed stream is broadcast to five parallel `KeyedProcessFunction` implementations:
+
+\begin{table}[H]
+\centering
+\caption{Flink Processor Specifications and State Management}
+\label{tab:processors}
+\begin{tabular}{@{}llp{8cm}@{}}
+\toprule
+\textbf{Processor} & \textbf{State Mechanism} & \textbf{Analytical Logic} \\
+\midrule
+Kill Streak Detector & \texttt{ValueState<Integer>} & Tracks consecutive boundaries/wickets. Emits alerts for specific milestones (e.g., 3 boundaries in a row). Resets state on a dot ball. \\
+Aggression Analyzer & \texttt{SlidingEventTimeWindow} & Computes a boundary-to-dot-ball ratio over a 2-minute sliding window. Classifies play style as Defensive, Balanced, or Aggressive. \\
+Inactivity Detector & \texttt{ProcessingTimeTimer} & Registers a timer upon receiving an event. If no new event arrives before the timer fires (e.g., 30 seconds), it emits an AFK/Inactivity alert. \\
+Momentum Detector & \texttt{ListState<Event>} & Analyzes the last $N$ events to detect rising or falling performance trends, indicating a shift in momentum toward the batsman or bowler. \\
+Win Predictor & \texttt{ValueState<Double>} & Implements a basic Bayesian probability calculation based on current score, remaining wickets, and historical run rates to output a dynamic win percentage. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The outputs from all five processors (which are `Commentary` objects) are merged using the \texttt{union()} operator and serialized back into the \texttt{commentary} Kafka topic. Flink checkpointing is enabled at 10-second intervals to provide fault tolerance.
+
+\subsection{Cricket Game Simulator}
+
+The data source is a custom-built, browser-based interactive cricket simulator. It utilizes HTML5 Canvas for rendering the field, pitch, batsman, and 9 fielders. The game loop operates as a finite state machine:
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{cricket_game_engine_1777743926445.png}
+\caption{Cricket game engine state machine and timing-based probability outcomes}
+\label{fig:gameengine}
+\end{figure}
+
+\begin{enumerate}
+\item \textbf{Waiting}: The bowler prepares. An auto-bowl timer counts down.
+\item \textbf{Bowling}: The ball is spawned with a random velocity and swing vector. It travels down the pitch. The player must press the SPACE bar to swing the bat.
+\item \textbf{Result}: The engine calculates the Euclidean distance between the ball and the bat at the exact moment of the swing.
+\end{enumerate}
+
+Shot outcomes are determined by this timing accuracy, injecting realistic probability into the simulation:
+\begin{itemize}
+\item \textbf{Perfect Timing} ($d < 25$px): 30\% chance of a Six, 30\% Four, 20\% Two, 20\% Single.
+\item \textbf{Good Timing} ($d < 60$px): 15\% Six, 25\% Four, 20\% Two.
+\item \textbf{Early/Late Swing} ($d < 110$px): High probability of being caught out or edging the ball.
+\item \textbf{Miss} ($d > 120$px): 35\% chance of being Bowled, 65\% Dot ball.
+\end{itemize}
+
+Each outcome triggers the emission of a game event payload over the WebSocket connection.
+
+\subsection{Commentary Engine and Emotion Classification}
+
+The Node.js backend houses the Commentary Engine. It maps raw events and Flink analytical outputs to human-readable strings. The engine uses curated template pools and categorizes commentary based on emotional intensity:
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{commentary_system_1777743890514.png}
+\caption{Commentary generation flowchart showing event classification and emotion-based selection}
+\label{fig:commentary}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Commentary Emotion Classification and Prioritization}
+\label{tab:emotions}
+\begin{tabular}{@{}llcl@{}}
+\toprule
+\textbf{Emotion} & \textbf{Trigger Events} & \textbf{Priority} & \textbf{Visual Indicator} \\
+\midrule
+INTENSE & Sixes, High Aggression & 9 & Red / Fire Emoji \\
+HYPE & Fours, Momentum Shifts & 8 & Orange / Rocket Emoji \\
+CRITICAL & Wickets, Milestones & 10 & Blue / Lightning Emoji \\
+CALM & Dot balls, Defensive play & 3 & Green / Bat Emoji \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A deduplication cache tracks the last 5 generated lines to prevent repetitive commentary. Contextual information, such as the current score and over number, is dynamically injected into the templates.

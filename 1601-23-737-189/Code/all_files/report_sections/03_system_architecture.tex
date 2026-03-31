@@ -1,0 +1,73 @@
+%=============================================
+\section{System Architecture}
+%=============================================
+
+\subsection{High-Level Architecture}
+The system is built upon a microservices architecture, heavily utilizing containerization to isolate and manage dependencies. It consists of nine interconnected services communicating over a dedicated Docker bridge network. Figure~\ref{fig:arch} illustrates the complete system architecture, showing the interaction between the frontend, backend, stream processing pipeline, and the TTS engine.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{system_architecture_1777743769425.png}
+\caption{High-level system architecture of the Real-Time AI Cricket Commentator}
+\label{fig:arch}
+\end{figure}
+
+\subsection{Data Flow Pipeline}
+The system operates on a continuous loop of event generation, processing, and feedback. The end-to-end data flow is illustrated in Figure~\ref{fig:dataflow} and proceeds as follows:
+
+\begin{enumerate}
+\item \textbf{Event Generation}: The user interacts with the React frontend, triggering a cricket game event (e.g., hitting a six, taking a wicket). The browser constructs a JSON payload detailing the event.
+\item \textbf{Ingestion}: The browser sends the JSON event to the Node.js Backend API via an open WebSocket connection. The backend acts as a Kafka Producer, immediately publishing the event to the \texttt{game-events} Kafka topic.
+\item \textbf{Stream Processing}: Apache Flink, acting as a Kafka Consumer, ingests the \texttt{game-events} topic. The data stream is keyed by \texttt{player\_id} and duplicated across five parallel processors (Kill Streak, Aggression, Inactivity, Momentum, Win Predictor).
+\item \textbf{Commentary Output}: The Flink processors analyze the event within the context of recent history. If a significant pattern is detected, they generate a commentary trigger. These triggers are unified into a single stream and published to the \texttt{commentary} Kafka topic.
+\item \textbf{Broadcasting}: The Node.js Backend consumes the \texttt{commentary} topic. It applies emotion tagging and formatting, then broadcasts the text commentary back to all connected React clients via WebSocket.
+\item \textbf{Voice Synthesis}: Simultaneously, the backend makes an asynchronous HTTP POST request to the Python TTS service, requesting voice synthesis for the commentary string. The TTS service returns a Base64-encoded WAV file, which the backend then forwards to the browser via WebSocket for audio playback.
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{data_flow_pipeline_1777743783686.png}
+\caption{Complete data flow pipeline from event generation to commentary delivery}
+\label{fig:dataflow}
+\end{figure}
+
+\subsection{Technology Stack}
+The project utilizes a modern, robust technology stack suitable for production-grade big data applications.
+
+\begin{table}[H]
+\centering
+\caption{Technology Stack Overview}
+\label{tab:techstack}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Layer} & \textbf{Technology} & \textbf{Version} \\
+\midrule
+Event Streaming & Apache Kafka (Confluent) & 7.5.0 \\
+Stream Processing & Apache Flink (DataStream API) & 1.18.1 \\
+Game Simulator & HTML5 Canvas / React & 18.x \\
+Backend API & Node.js + Express + WebSocket (ws) & 20.x \\
+Frontend UI & React + Vite & 18 / 5 \\
+TTS Engine & Python + Coqui XTTS-v2 & 3.11 \\
+Containerization & Docker + Docker Compose & Latest \\
+Reverse Proxy & Nginx & Alpine \\
+Coordination & Apache Zookeeper & 7.5.0 \\
+Build Tool & Apache Maven & 3.9 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Communication Protocols}
+The system employs three distinct communication protocols optimized for their specific use cases:
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{websocket_realtime_1777743907214.png}
+\caption{WebSocket bidirectional communication between frontend and backend}
+\label{fig:websocket}
+\end{figure}
+
+\begin{itemize}
+\item \textbf{Apache Kafka (TCP)}: Used for asynchronous, high-throughput, persistent event streaming between the backend Node.js server and the Flink cluster. It decouples the web tier from the analytics tier.
+\item \textbf{WebSocket (TCP)}: Used for real-time, low-latency, bidirectional communication between the user's browser and the backend server. It allows the server to push updates (commentary, stats, audio) to the client without the overhead of HTTP polling.
+\item \textbf{REST API (HTTP)}: Used for synchronous communication between the backend server and the Python TTS service, and for general health checks.
+\end{itemize}

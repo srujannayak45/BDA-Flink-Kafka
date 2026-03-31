@@ -1,0 +1,25 @@
+%=============================================
+\section{Literature Review}
+%=============================================
+
+\subsection{Real-Time Stream Processing Architectures}
+The evolution of big data has shifted focus from batch processing frameworks like Apache Hadoop to real-time stream processing engines. Apache Kafka, initially developed at LinkedIn, provides a distributed, fault-tolerant event streaming platform capable of handling millions of events per second with persistent storage. Its publish-subscribe model with topic-based partitioning enables horizontal scalability and serves as the backbone for modern event-driven architectures.
+
+Apache Flink extends this ecosystem with stateful stream processing capabilities. Unlike earlier systems like Apache Storm, Flink provides event-time processing, exactly-once state consistency semantics, and robust checkpointing. Its ability to handle complex event processing through keyed state, sliding windows, and processing-time timers makes it highly suitable for real-time sports analytics where temporal relationships between events are critical.
+
+\subsection{Automated Sports Commentary and Narrative Generation}
+The generation of sports commentary has been an active area of research in Natural Language Generation (NLG). Early approaches relied heavily on rule-based template systems and state machines. While these systems guaranteed grammatical correctness, they often sounded repetitive and lacked emotional variance.
+
+Chen and Mooney (2008) proposed SPortsCast, a system for grounded language generation from structured Robocup simulation data, bridging the gap between raw events and semantic meaning. More recent work has explored neural language models for generating sports narratives. Deep learning approaches using sequence-to-sequence models with attention mechanisms and transformer architectures have shown promise in generating contextually rich commentary that adapts to the flow of the game.
+
+Our approach combines the reliability of template-based generation with dynamic emotion tagging, prioritizing low-latency execution (crucial for live sports) over the computational overhead of generating every token via an LLM in real-time.
+
+\subsection{Neural Text-to-Speech and Voice Cloning}
+Modern Text-to-Speech (TTS) systems have evolved significantly from older concatenative synthesis (which spliced pre-recorded phonemes) and statistical parametric synthesis. The introduction of end-to-end neural models revolutionized the field. 
+
+Tacotron 2 introduced mel-spectrogram prediction with WaveNet vocoding, producing highly natural speech. VITS unified acoustic modeling and vocoding into an end-to-end architecture using normalizing flows and adversarial training. 
+
+Recently, zero-shot voice cloning models like XTTS-v2, developed by Coqui, have emerged. XTTS-v2 can clone a target voice from merely a 3-second reference audio sample, supporting 17 languages with natural prosody and emotion transfer. This capability is pivotal for this project, as it allows the system to mimic the specific cadence, excitement, and tonal qualities of a professional cricket commentator without requiring hours of studio recording for fine-tuning.
+
+\subsection{Microservices and Container Orchestration}
+The microservices architectural pattern decomposes applications into loosely coupled, independently deployable services. This is a departure from monolithic architectures and aligns perfectly with distributed big data tools. Docker containerization encapsulates each service with its dependencies, ensuring consistent execution across environments. Docker Compose provides orchestration for multi-container applications, defining network topologies, volume mounts, and service dependencies, which is essential for coordinating the nine separate services required for this project.

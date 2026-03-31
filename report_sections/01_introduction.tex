@@ -1,0 +1,47 @@
+%=============================================
+\section{Introduction}
+%=============================================
+
+\subsection{Background and Motivation}
+The rapid advancement of real-time data streaming technologies has revolutionized how we process and analyze live data feeds. In the sports broadcasting industry, commentary has traditionally been a purely human endeavor, requiring experienced commentators with deep domain knowledge and rapid cognitive processing skills. However, the convergence of distributed computing, natural language processing, and neural text-to-speech synthesis has made automated, real-time sports commentary a viable technological pursuit.
+
+Cricket, one of the most data-rich sports globally, generates a continuous stream of events during live matches---each delivery, run, wicket, and fielding action represents a discrete data point that can be captured, processed, and narrated in real time. This project addresses the challenge of building a production-grade, distributed system capable of simulating live cricket, processing events through a multi-stage analytics pipeline, generating contextually appropriate commentary, and delivering synthesized voice output to users---all with sub-second latency.
+
+The motivation behind this project stems from the need to democratize live sports broadcasting. While major international matches receive premium commentary, thousands of domestic, club, and amateur matches go unbroadcasted. An automated AI commentator can provide a professional broadcasting experience for any match with a digitized scorecard, scaling infinitely without the associated human resource costs.
+
+\subsection{Problem Statement}
+The primary objective of this project is to design and implement a real-time AI-powered cricket commentary system that:
+\begin{enumerate}
+\item Simulates live cricket matches through an interactive browser-based game.
+\item Streams game events through Apache Kafka for distributed processing.
+\item Processes events using Apache Flink with multiple parallel analytical processors.
+\item Generates emotion-classified natural language commentary based on real-time game context.
+\item Synthesizes human-like speech using XTTS-v2 neural voice cloning technology.
+\item Delivers commentary to users via a React dashboard with WebSocket connectivity.
+\item Containerizes the entire system using Docker Compose for reproducible deployment and horizontal scalability.
+\end{enumerate}
+
+\subsection{Scope of the Project}
+This project encompasses the full stack of a distributed streaming application, from event generation to audio delivery. The system integrates nine Docker containers, three programming languages (Java, JavaScript, Python), and multiple distributed systems technologies. The scope includes:
+\begin{itemize}
+\item \textbf{Event Generation}: A custom React-based HTML5 Canvas cricket simulator that emits structured JSON events based on user input and physics calculations.
+\item \textbf{Data Ingestion \& Routing}: Apache Kafka acting as the central nervous system, handling high-throughput event routing with persistent storage.
+\item \textbf{Real-Time Analytics}: Apache Flink processing the event stream to detect kill streaks (consecutive boundaries/wickets), momentum shifts, inactivity, aggression ratios, and win probabilities.
+\item \textbf{Commentary Engine}: A Node.js service that maps analytical outcomes to pre-authored, emotion-tagged commentary templates.
+\item \textbf{Neural TTS}: A Python Flask microservice leveraging Coqui XTTS-v2 for zero-shot voice cloning from a reference broadcaster audio sample.
+\item \textbf{Frontend Dashboard}: A comprehensive web interface for playing the game, viewing live stats, reading the commentary timeline, and listening to the generated audio.
+\end{itemize}
+
+\subsection{Methodology}
+The project follows an agile, microservices-oriented development methodology. Each component was developed, containerized, and tested independently before integration. The architecture is heavily decoupled; the simulator is unaware of the analytics engine, the analytics engine is unaware of the voice synthesis, and the frontend simply consumes WebSocket streams. This separation of concerns allows for independent scaling and maintenance of each tier.
+
+\subsection{Organization of the Report}
+The remainder of this report is organized as follows: 
+Section~2 reviews related work in stream processing and automated commentary. 
+Section~3 presents the high-level system architecture and data flow. 
+Section~4 details the component design, including Kafka topics and Flink processors. 
+Section~5 covers the implementation details of the backend, frontend, and Docker containerization. 
+Section~6 describes the Text-to-Speech integration. 
+Section~7 presents performance evaluation and results. 
+Section~8 outlines future scope and potential enhancements. 
+Section~9 concludes the report.

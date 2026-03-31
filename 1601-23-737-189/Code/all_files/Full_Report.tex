@@ -1,0 +1,548 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{setspace}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{tocloft}
+
+\graphicspath{{./images/}}
+\onehalfspacing
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!10},
+  keywordstyle=\color{blue},
+  commentstyle=\color{green!50!black},
+  stringstyle=\color{red!60!black},
+  numbers=left,
+  numberstyle=\tiny\color{gray}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Real-Time AI Cricket Commentator}
+\lhead{BDA Project Report}
+\cfoot{\thepage}
+
+\begin{document}
+
+\begin{titlepage}
+\centering
+\vspace*{1cm}
+{\Huge\bfseries Real-Time AI Cricket Commentator\\with Voice Output\par}
+\vspace{1.5cm}
+{\Large A Distributed Stream Processing System\\Using Apache Kafka and Apache Flink\par}
+\vspace{2cm}
+{\large\bfseries Big Data Analytics (BDA)\\Course Project Report\par}
+\vspace{2cm}
+{\Large\bfseries Srujan Nayak\par}
+\vspace{0.5cm}
+{\large Department of Computer Science and Engineering\par}
+\vspace{2cm}
+{\large\today\par}
+\vfill
+{\large Technologies: Apache Kafka $\cdot$ Apache Flink $\cdot$ React $\cdot$ Node.js $\cdot$ Python $\cdot$ Docker\par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+\listoffigures
+\listoftables
+\newpage
+
+% --- Start of report_sections/01_introduction.tex ---
+%=============================================
+\section{Introduction}
+%=============================================
+
+\subsection{Background and Motivation}
+The rapid advancement of real-time data streaming technologies has revolutionized how we process and analyze live data feeds. In the sports broadcasting industry, commentary has traditionally been a purely human endeavor, requiring experienced commentators with deep domain knowledge and rapid cognitive processing skills. However, the convergence of distributed computing, natural language processing, and neural text-to-speech synthesis has made automated, real-time sports commentary a viable technological pursuit.
+
+Cricket, one of the most data-rich sports globally, generates a continuous stream of events during live matches---each delivery, run, wicket, and fielding action represents a discrete data point that can be captured, processed, and narrated in real time. This project addresses the challenge of building a production-grade, distributed system capable of simulating live cricket, processing events through a multi-stage analytics pipeline, generating contextually appropriate commentary, and delivering synthesized voice output to users---all with sub-second latency.
+
+The motivation behind this project stems from the need to democratize live sports broadcasting. While major international matches receive premium commentary, thousands of domestic, club, and amateur matches go unbroadcasted. An automated AI commentator can provide a professional broadcasting experience for any match with a digitized scorecard, scaling infinitely without the associated human resource costs.
+
+\subsection{Problem Statement}
+The primary objective of this project is to design and implement a real-time AI-powered cricket commentary system that:
+\begin{enumerate}
+\item Simulates live cricket matches through an interactive browser-based game.
+\item Streams game events through Apache Kafka for distributed processing.
+\item Processes events using Apache Flink with multiple parallel analytical processors.
+\item Generates emotion-classified natural language commentary based on real-time game context.
+\item Synthesizes human-like speech using XTTS-v2 neural voice cloning technology.
+\item Delivers commentary to users via a React dashboard with WebSocket connectivity.
+\item Containerizes the entire system using Docker Compose for reproducible deployment and horizontal scalability.
+\end{enumerate}
+
+\subsection{Scope of the Project}
+This project encompasses the full stack of a distributed streaming application, from event generation to audio delivery. The system integrates nine Docker containers, three programming languages (Java, JavaScript, Python), and multiple distributed systems technologies. The scope includes:
+\begin{itemize}
+\item \textbf{Event Generation}: A custom React-based HTML5 Canvas cricket simulator that emits structured JSON events based on user input and physics calculations.
+\item \textbf{Data Ingestion \& Routing}: Apache Kafka acting as the central nervous system, handling high-throughput event routing with persistent storage.
+\item \textbf{Real-Time Analytics}: Apache Flink processing the event stream to detect kill streaks (consecutive boundaries/wickets), momentum shifts, inactivity, aggression ratios, and win probabilities.
+\item \textbf{Commentary Engine}: A Node.js service that maps analytical outcomes to pre-authored, emotion-tagged commentary templates.
+\item \textbf{Neural TTS}: A Python Flask microservice leveraging Coqui XTTS-v2 for zero-shot voice cloning from a reference broadcaster audio sample.
+\item \textbf{Frontend Dashboard}: A comprehensive web interface for playing the game, viewing live stats, reading the commentary timeline, and listening to the generated audio.
+\end{itemize}
+
+\subsection{Methodology}
+The project follows an agile, microservices-oriented development methodology. Each component was developed, containerized, and tested independently before integration. The architecture is heavily decoupled; the simulator is unaware of the analytics engine, the analytics engine is unaware of the voice synthesis, and the frontend simply consumes WebSocket streams. This separation of concerns allows for independent scaling and maintenance of each tier.
+
+\subsection{Organization of the Report}
+The remainder of this report is organized as follows: 
+Section~2 reviews related work in stream processing and automated commentary. 
+Section~3 presents the high-level system architecture and data flow. 
+Section~4 details the component design, including Kafka topics and Flink processors. 
+Section~5 covers the implementation details of the backend, frontend, and Docker containerization. 
+Section~6 describes the Text-to-Speech integration. 
+Section~7 presents performance evaluation and results. 
+Section~8 outlines future scope and potential enhancements. 
+Section~9 concludes the report.
+
+% --- End of report_sections/01_introduction.tex ---
+
+\newpage
+% --- Start of report_sections/02_literature_review.tex ---
+%=============================================
+\section{Literature Review}
+%=============================================
+
+\subsection{Real-Time Stream Processing Architectures}
+The evolution of big data has shifted focus from batch processing frameworks like Apache Hadoop to real-time stream processing engines. Apache Kafka, initially developed at LinkedIn, provides a distributed, fault-tolerant event streaming platform capable of handling millions of events per second with persistent storage. Its publish-subscribe model with topic-based partitioning enables horizontal scalability and serves as the backbone for modern event-driven architectures.
+
+Apache Flink extends this ecosystem with stateful stream processing capabilities. Unlike earlier systems like Apache Storm, Flink provides event-time processing, exactly-once state consistency semantics, and robust checkpointing. Its ability to handle complex event processing through keyed state, sliding windows, and processing-time timers makes it highly suitable for real-time sports analytics where temporal relationships between events are critical.
+
+\subsection{Automated Sports Commentary and Narrative Generation}
+The generation of sports commentary has been an active area of research in Natural Language Generation (NLG). Early approaches relied heavily on rule-based template systems and state machines. While these systems guaranteed grammatical correctness, they often sounded repetitive and lacked emotional variance.
+
+Chen and Mooney (2008) proposed SPortsCast, a system for grounded language generation from structured Robocup simulation data, bridging the gap between raw events and semantic meaning. More recent work has explored neural language models for generating sports narratives. Deep learning approaches using sequence-to-sequence models with attention mechanisms and transformer architectures have shown promise in generating contextually rich commentary that adapts to the flow of the game.
+
+Our approach combines the reliability of template-based generation with dynamic emotion tagging, prioritizing low-latency execution (crucial for live sports) over the computational overhead of generating every token via an LLM in real-time.
+
+\subsection{Neural Text-to-Speech and Voice Cloning}
+Modern Text-to-Speech (TTS) systems have evolved significantly from older concatenative synthesis (which spliced pre-recorded phonemes) and statistical parametric synthesis. The introduction of end-to-end neural models revolutionized the field. 
+
+Tacotron 2 introduced mel-spectrogram prediction with WaveNet vocoding, producing highly natural speech. VITS unified acoustic modeling and vocoding into an end-to-end architecture using normalizing flows and adversarial training. 
+
+Recently, zero-shot voice cloning models like XTTS-v2, developed by Coqui, have emerged. XTTS-v2 can clone a target voice from merely a 3-second reference audio sample, supporting 17 languages with natural prosody and emotion transfer. This capability is pivotal for this project, as it allows the system to mimic the specific cadence, excitement, and tonal qualities of a professional cricket commentator without requiring hours of studio recording for fine-tuning.
+
+\subsection{Microservices and Container Orchestration}
+The microservices architectural pattern decomposes applications into loosely coupled, independently deployable services. This is a departure from monolithic architectures and aligns perfectly with distributed big data tools. Docker containerization encapsulates each service with its dependencies, ensuring consistent execution across environments. Docker Compose provides orchestration for multi-container applications, defining network topologies, volume mounts, and service dependencies, which is essential for coordinating the nine separate services required for this project.
+
+% --- End of report_sections/02_literature_review.tex ---
+
+\newpage
+% --- Start of report_sections/03_system_architecture.tex ---
+%=============================================
+\section{System Architecture}
+%=============================================
+
+\subsection{High-Level Architecture}
+The system is built upon a microservices architecture, heavily utilizing containerization to isolate and manage dependencies. It consists of nine interconnected services communicating over a dedicated Docker bridge network. Figure~\ref{fig:arch} illustrates the complete system architecture, showing the interaction between the frontend, backend, stream processing pipeline, and the TTS engine.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{system_architecture_1777743769425.png}
+\caption{High-level system architecture of the Real-Time AI Cricket Commentator}
+\label{fig:arch}
+\end{figure}
+
+\subsection{Data Flow Pipeline}
+The system operates on a continuous loop of event generation, processing, and feedback. The end-to-end data flow is illustrated in Figure~\ref{fig:dataflow} and proceeds as follows:
+
+\begin{enumerate}
+\item \textbf{Event Generation}: The user interacts with the React frontend, triggering a cricket game event (e.g., hitting a six, taking a wicket). The browser constructs a JSON payload detailing the event.
+\item \textbf{Ingestion}: The browser sends the JSON event to the Node.js Backend API via an open WebSocket connection. The backend acts as a Kafka Producer, immediately publishing the event to the \texttt{game-events} Kafka topic.
+\item \textbf{Stream Processing}: Apache Flink, acting as a Kafka Consumer, ingests the \texttt{game-events} topic. The data stream is keyed by \texttt{player\_id} and duplicated across five parallel processors (Kill Streak, Aggression, Inactivity, Momentum, Win Predictor).
+\item \textbf{Commentary Output}: The Flink processors analyze the event within the context of recent history. If a significant pattern is detected, they generate a commentary trigger. These triggers are unified into a single stream and published to the \texttt{commentary} Kafka topic.
+\item \textbf{Broadcasting}: The Node.js Backend consumes the \texttt{commentary} topic. It applies emotion tagging and formatting, then broadcasts the text commentary back to all connected React clients via WebSocket.
+\item \textbf{Voice Synthesis}: Simultaneously, the backend makes an asynchronous HTTP POST request to the Python TTS service, requesting voice synthesis for the commentary string. The TTS service returns a Base64-encoded WAV file, which the backend then forwards to the browser via WebSocket for audio playback.
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{data_flow_pipeline_1777743783686.png}
+\caption{Complete data flow pipeline from event generation to commentary delivery}
+\label{fig:dataflow}
+\end{figure}
+
+\subsection{Technology Stack}
+The project utilizes a modern, robust technology stack suitable for production-grade big data applications.
+
+\begin{table}[H]
+\centering
+\caption{Technology Stack Overview}
+\label{tab:techstack}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Layer} & \textbf{Technology} & \textbf{Version} \\
+\midrule
+Event Streaming & Apache Kafka (Confluent) & 7.5.0 \\
+Stream Processing & Apache Flink (DataStream API) & 1.18.1 \\
+Game Simulator & HTML5 Canvas / React & 18.x \\
+Backend API & Node.js + Express + WebSocket (ws) & 20.x \\
+Frontend UI & React + Vite & 18 / 5 \\
+TTS Engine & Python + Coqui XTTS-v2 & 3.11 \\
+Containerization & Docker + Docker Compose & Latest \\
+Reverse Proxy & Nginx & Alpine \\
+Coordination & Apache Zookeeper & 7.5.0 \\
+Build Tool & Apache Maven & 3.9 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Communication Protocols}
+The system employs three distinct communication protocols optimized for their specific use cases:
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{websocket_realtime_1777743907214.png}
+\caption{WebSocket bidirectional communication between frontend and backend}
+\label{fig:websocket}
+\end{figure}
+
+\begin{itemize}
+\item \textbf{Apache Kafka (TCP)}: Used for asynchronous, high-throughput, persistent event streaming between the backend Node.js server and the Flink cluster. It decouples the web tier from the analytics tier.
+\item \textbf{WebSocket (TCP)}: Used for real-time, low-latency, bidirectional communication between the user's browser and the backend server. It allows the server to push updates (commentary, stats, audio) to the client without the overhead of HTTP polling.
+\item \textbf{REST API (HTTP)}: Used for synchronous communication between the backend server and the Python TTS service, and for general health checks.
+\end{itemize}
+
+% --- End of report_sections/03_system_architecture.tex ---
+
+\newpage
+% --- Start of report_sections/04_component_design.tex ---
+%=============================================
+\section{Component Design and Implementation}
+%=============================================
+
+\subsection{Apache Kafka Event Streaming}
+
+Kafka acts as the central data hub. It is configured with three topics, each with 3 partitions and a replication factor of 1 (due to the single-broker local deployment).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{kafka_event_flow_1777743860188.png}
+\caption{Kafka topic architecture showing producers, consumers, and data schemas}
+\label{fig:kafka}
+\end{figure}
+
+\begin{itemize}
+\item \textbf{game-events}: Stores raw game events (runs, wickets, dot balls) keyed by \texttt{player\_id}. This guarantees that all events for a specific player are routed to the same partition, ensuring ordered processing by Flink.
+\item \textbf{commentary}: Stores processed commentary objects originating from the Flink processors.
+\item \textbf{game-stats}: Maintains aggregated player statistics for dashboard display and historical tracking.
+\end{itemize}
+
+Each game event is serialized as a JSON object:
+\begin{lstlisting}[language=Java,caption={Game Event JSON Schema}]
+{
+  "match_id": "match_1714600000000",
+  "player_id": "batsman_1",
+  "player_name": "Srujan",
+  "action": "runs",
+  "timestamp": 1714600001234,
+  "game_tick": 42,
+  "details": {
+    "runs": 6,
+    "timing": "perfect",
+    "score": 85,
+    "wickets": 3,
+    "overs": "7.2"
+  }
+}
+\end{lstlisting}
+
+\subsection{Apache Flink Stream Processing}
+
+The core analytical intelligence resides in the Apache Flink job, written in Java using the DataStream API. Flink reads from Kafka, deserializes the JSON, applies watermarks for out-of-order event handling, and then keys the stream by \texttt{player\_id}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{flink_processing_1777743825933.png}
+\caption{Apache Flink stream processing pipeline detailing the five parallel analyzers}
+\label{fig:flinkpipeline}
+\end{figure}
+
+The keyed stream is broadcast to five parallel `KeyedProcessFunction` implementations:
+
+\begin{table}[H]
+\centering
+\caption{Flink Processor Specifications and State Management}
+\label{tab:processors}
+\begin{tabular}{@{}llp{8cm}@{}}
+\toprule
+\textbf{Processor} & \textbf{State Mechanism} & \textbf{Analytical Logic} \\
+\midrule
+Kill Streak Detector & \texttt{ValueState<Integer>} & Tracks consecutive boundaries/wickets. Emits alerts for specific milestones (e.g., 3 boundaries in a row). Resets state on a dot ball. \\
+Aggression Analyzer & \texttt{SlidingEventTimeWindow} & Computes a boundary-to-dot-ball ratio over a 2-minute sliding window. Classifies play style as Defensive, Balanced, or Aggressive. \\
+Inactivity Detector & \texttt{ProcessingTimeTimer} & Registers a timer upon receiving an event. If no new event arrives before the timer fires (e.g., 30 seconds), it emits an AFK/Inactivity alert. \\
+Momentum Detector & \texttt{ListState<Event>} & Analyzes the last $N$ events to detect rising or falling performance trends, indicating a shift in momentum toward the batsman or bowler. \\
+Win Predictor & \texttt{ValueState<Double>} & Implements a basic Bayesian probability calculation based on current score, remaining wickets, and historical run rates to output a dynamic win percentage. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The outputs from all five processors (which are `Commentary` objects) are merged using the \texttt{union()} operator and serialized back into the \texttt{commentary} Kafka topic. Flink checkpointing is enabled at 10-second intervals to provide fault tolerance.
+
+\subsection{Cricket Game Simulator}
+
+The data source is a custom-built, browser-based interactive cricket simulator. It utilizes HTML5 Canvas for rendering the field, pitch, batsman, and 9 fielders. The game loop operates as a finite state machine:
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{cricket_game_engine_1777743926445.png}
+\caption{Cricket game engine state machine and timing-based probability outcomes}
+\label{fig:gameengine}
+\end{figure}
+
+\begin{enumerate}
+\item \textbf{Waiting}: The bowler prepares. An auto-bowl timer counts down.
+\item \textbf{Bowling}: The ball is spawned with a random velocity and swing vector. It travels down the pitch. The player must press the SPACE bar to swing the bat.
+\item \textbf{Result}: The engine calculates the Euclidean distance between the ball and the bat at the exact moment of the swing.
+\end{enumerate}
+
+Shot outcomes are determined by this timing accuracy, injecting realistic probability into the simulation:
+\begin{itemize}
+\item \textbf{Perfect Timing} ($d < 25$px): 30\% chance of a Six, 30\% Four, 20\% Two, 20\% Single.
+\item \textbf{Good Timing} ($d < 60$px): 15\% Six, 25\% Four, 20\% Two.
+\item \textbf{Early/Late Swing} ($d < 110$px): High probability of being caught out or edging the ball.
+\item \textbf{Miss} ($d > 120$px): 35\% chance of being Bowled, 65\% Dot ball.
+\end{itemize}
+
+Each outcome triggers the emission of a game event payload over the WebSocket connection.
+
+\subsection{Commentary Engine and Emotion Classification}
+
+The Node.js backend houses the Commentary Engine. It maps raw events and Flink analytical outputs to human-readable strings. The engine uses curated template pools and categorizes commentary based on emotional intensity:
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{commentary_system_1777743890514.png}
+\caption{Commentary generation flowchart showing event classification and emotion-based selection}
+\label{fig:commentary}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Commentary Emotion Classification and Prioritization}
+\label{tab:emotions}
+\begin{tabular}{@{}llcl@{}}
+\toprule
+\textbf{Emotion} & \textbf{Trigger Events} & \textbf{Priority} & \textbf{Visual Indicator} \\
+\midrule
+INTENSE & Sixes, High Aggression & 9 & Red / Fire Emoji \\
+HYPE & Fours, Momentum Shifts & 8 & Orange / Rocket Emoji \\
+CRITICAL & Wickets, Milestones & 10 & Blue / Lightning Emoji \\
+CALM & Dot balls, Defensive play & 3 & Green / Bat Emoji \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A deduplication cache tracks the last 5 generated lines to prevent repetitive commentary. Contextual information, such as the current score and over number, is dynamically injected into the templates.
+
+% --- End of report_sections/04_component_design.tex ---
+
+\newpage
+% --- Start of report_sections/05_implementation.tex ---
+%=============================================
+\section{Implementation and Integration}
+%=============================================
+
+\subsection{Docker Containerization}
+
+The entire system is orchestrated using Docker Compose. This ensures environment consistency, simplifies deployment, and allows for precise resource allocation. The project runs nine distinct containers within a custom bridged network.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{docker_architecture_1777743798253.png}
+\caption{Docker Compose container orchestration showing port mappings and dependencies}
+\label{fig:docker}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Docker Service Configuration}
+\label{tab:docker}
+\begin{tabular}{@{}llp{5cm}@{}}
+\toprule
+\textbf{Service} & \textbf{Ports} & \textbf{Purpose / Configuration} \\
+\midrule
+\texttt{zookeeper} & 2181 & Kafka coordination. \\
+\texttt{kafka} & 9092, 29092 & Message broker. Depends on Zookeeper. \\
+\texttt{kafka-init} & -- & Ephemeral container that creates the three required topics on startup. \\
+\texttt{jobmanager} & 8081 & Flink master node. \\
+\texttt{taskmanager} & -- & Flink worker node. Allocated 2GB RAM. \\
+\texttt{flink-job-submit} & -- & Compiles (Maven) and submits the Java JAR to the JobManager. \\
+\texttt{backend-api} & 3001 & Node.js Express/WebSocket server. \\
+\texttt{tts-service} & 5001 & Python Flask API. Allocated 4GB RAM for PyTorch/XTTS inference. \\
+\texttt{frontend-ui} & 3000 & Nginx serving the compiled React Vite application. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Docker health checks are heavily utilized to ensure services start in the correct order (e.g., Flink job submission waits until Kafka topics exist). Multi-stage Dockerfiles are used for the Flink processor and Frontend to minimize the final production image sizes.
+
+\subsection{Frontend Dashboard Implementation}
+
+The user interface is built with React 18 and Vite 5. It is designed as a dark-themed, responsive dashboard utilizing modern glassmorphism UI principles.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{frontend_component_tree_1777743959998.png}
+\caption{React component hierarchy and data propagation}
+\label{fig:components}
+\end{figure}
+
+The UI is divided into two main sections. The top section houses the \texttt{CricketGame} component, rendering the HTML5 Canvas simulator.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{frontend_cricket_field.jpg}
+\caption{Live interactive cricket match interface with Canvas-based field visualization}
+\label{fig:ui1}
+\end{figure}
+
+The lower section forms the analytics dashboard, featuring:
+\begin{itemize}
+\item \textbf{Commentary Feed}: An auto-scrolling list of commentary lines, color-coded by emotion tags.
+\item \textbf{Player Stats}: Real-time metrics including runs, balls faced, boundary counts, and dynamically calculated strike rate.
+\item \textbf{Win Prediction}: Animated progress bars showing the Flink-calculated win probability.
+\item \textbf{Event Timeline}: A historical log of all game events.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{frontend_dashboard.jpg}
+\caption{Analytics dashboard showing live commentary, match stats, and win probability}
+\label{fig:ui2}
+\end{figure}
+
+\subsection{Text-to-Speech Integration}
+
+The voice synthesis capability elevates the project from a text dashboard to a broadcasting tool. The \texttt{tts-service} is a Python application built with Flask and the Coqui TTS library.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{tts_voice_pipeline_1777743843494.png}
+\caption{TTS voice synthesis pipeline from text generation to browser audio playback}
+\label{fig:tts}
+\end{figure}
+
+The engine utilizes XTTS-v2. Upon receiving a commentary string, the model references a pre-provided 15-second WAV file of a professional sports commentator. It computes speaker embeddings to capture the tonal characteristics, accent, and pitch of the reference voice. It then performs neural synthesis to generate a new audio file reading the text in that cloned voice. 
+
+To ensure stability, generation parameters are tuned: \texttt{speed} is set to 1.1 for an energetic, fast-paced sports delivery, and \texttt{temperature} is set to 0.65 to balance vocal expressiveness with acoustic stability. The resulting WAV audio is Base64 encoded, returned to the backend, and forwarded via WebSocket to the React app, where the Web Audio API (\texttt{AudioContext}) queues and plays it seamlessly.
+
+% --- End of report_sections/05_implementation.tex ---
+
+\newpage
+% --- Start of report_sections/06_results_future_scope.tex ---
+%=============================================
+\section{Results, Evaluation, and Future Scope}
+%=============================================
+
+\subsection{Performance Metrics and Latency}
+
+A critical requirement for live sports commentary is low latency. Table~\ref{tab:latency} summarizes the measured latency across different stages of the data pipeline.
+
+\begin{table}[H]
+\centering
+\caption{End-to-End Pipeline Latency Measurements}
+\label{tab:latency}
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Pipeline Stage} & \textbf{Observed Latency (ms)} \\
+\midrule
+Browser Event $\rightarrow$ WebSocket $\rightarrow$ Kafka & $<$ 10 \\
+Kafka $\rightarrow$ Flink Processing & 50 -- 200 \\
+Flink Analysis $\rightarrow$ Commentary Generation & 10 -- 50 \\
+Commentary $\rightarrow$ WebSocket Broadcast & $<$ 20 \\
+\midrule
+TTS Neural Synthesis (CPU) & 2000 -- 5000 \\
+TTS Neural Synthesis (GPU - Estimated) & 500 -- 1000 \\
+\midrule
+\textbf{Text Commentary (End-to-End)} & \textbf{80 -- 280} \\
+\textbf{Voice Commentary (CPU)} & \textbf{2100 -- 5300} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The core analytical pipeline (excluding voice synthesis) consistently achieves sub-300ms latency. This means text commentary appears on the dashboard almost instantaneously after a shot is played in the simulator. The neural TTS synthesis, running on CPU in the Docker container, represents the primary bottleneck, taking 2 to 5 seconds to generate a sentence. However, this delay is acceptable for sports broadcasting, mimicking the natural reaction time of a human commentator.
+
+\subsection{Resource Utilization}
+
+The system demonstrates efficient resource utilization for a local deployment, though the TTS engine demands significant memory.
+
+\begin{table}[H]
+\centering
+\caption{Docker Container Resource Allocation and Usage}
+\label{tab:resources}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Container / Service} & \textbf{CPU Usage (\%)} & \textbf{RAM Allocation (MB)} \\
+\midrule
+Kafka + Zookeeper & 5 -- 15 & $\sim$ 800 \\
+Flink (JobManager + TaskManager) & 10 -- 25 & 3600 \\
+Backend API (Node.js) & 3 -- 8 & $\sim$ 150 \\
+TTS Service (Python / PyTorch) & 40 -- 90 (during inference) & 4096 \\
+Frontend (Nginx) & $<$ 1 & $\sim$ 20 \\
+\midrule
+\textbf{Total System Footprint} & \textbf{Variable} & \textbf{$\sim$ 8.6 GB} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Conclusion}
+
+This project successfully designed, implemented, and containerized a real-time AI cricket commentary system. It validates the integration of distributed streaming technologies (Kafka, Flink) with modern AI voice cloning (XTTS-v2) and real-time web technologies (WebSocket, React). The system reliably processes streaming game events, applies parallel analytical logic, and delivers emotion-aware, cloned-voice commentary with sub-second text latency. It serves as a comprehensive reference architecture for building scalable, real-time analytics and AI broadcasting applications.
+
+\subsection{Future Scope}
+
+The architecture is highly extensible. Several enhancements are proposed for future iterations:
+
+\begin{enumerate}
+\item \textbf{GPU-Accelerated Inference}: Deploying the \texttt{tts-service} with NVIDIA Container Toolkit to utilize CUDA acceleration, which would reduce audio generation latency from 5 seconds to under 1 second.
+\item \textbf{LLM Integration}: Replacing the template-based commentary engine with a fine-tuned Large Language Model (e.g., LLaMA-3) to generate dynamic, unscripted narratives based on the Flink context.
+\item \textbf{Computer Vision Ingestion}: Replacing the React simulator with a computer vision module that ingests real-world live video feeds, tracks the ball and players, and emits Kafka events automatically.
+\item \textbf{Cloud-Native Deployment}: Migrating from local Docker Compose to a Kubernetes cluster on AWS or GCP, utilizing managed services like Confluent Cloud for Kafka and Amazon EKS for auto-scaling Flink task managers.
+\item \textbf{Multi-Language Support}: Utilizing XTTS-v2's multilingual capabilities to provide instant translation and commentary delivery in regional languages (e.g., Hindi, Tamil) from the same underlying event stream.
+\item \textbf{Advanced Machine Learning Models}: Replacing the Bayesian win predictor with a trained LSTM or Transformer model that has ingested years of historical cricket scorecard data.
+\end{enumerate}
+
+% --- End of report_sections/06_results_future_scope.tex ---
+
+\newpage
+
+%=============================================
+\section*{References}
+\addcontentsline{toc}{section}{References}
+%=============================================
+
+\begin{enumerate}[label={[\arabic*]}]
+\item J. Kreps, N. Narkhede, and J. Rao, ``Kafka: A distributed messaging system for log processing,'' NetDB Workshop, 2011.
+\item P. Carbone et al., ``Apache Flink: Stream and batch processing in a single engine,'' IEEE TCDE Bulletin, vol. 38, no. 4, 2015.
+\item E. Casanova et al., ``XTTS: A massively multilingual zero-shot text-to-speech model,'' arXiv:2406.04904, 2024.
+\item J. Shen et al., ``Natural TTS synthesis by conditioning WaveNet on mel spectrogram predictions,'' ICASSP, 2018.
+\item J. Kim et al., ``Conditional variational autoencoder with adversarial learning for end-to-end TTS,'' ICML, 2021.
+\item D. Chen and R. Mooney, ``Learning to sportscast: A test of grounded language acquisition,'' ICML, 2008.
+\item E. Reiter and R. Dale, \textit{Building Natural Language Generation Systems}, Cambridge University Press, 2000.
+\item A. Al-Fuqaha et al., ``Internet of things: A survey,'' \textit{IEEE Comm. Surveys and Tutorials}, vol. 17, no. 4, 2015.
+\item M. Friedman et al., ``A survey of stream processing systems,'' \textit{ACM Computing Surveys}, vol. 54, no. 5, 2021.
+\item Docker Inc., ``Docker Compose documentation,'' \url{https://docs.docker.com/compose/}, 2024.
+\item Apache Software Foundation, ``Apache Flink Documentation,'' \url{https://flink.apache.org/}, 2024.
+\item Confluent Inc., ``Apache Kafka Documentation,'' \url{https://kafka.apache.org/}, 2024.
+\item Meta Platforms, ``React Documentation,'' \url{https://react.dev/}, 2024.
+\item Node.js Foundation, ``Node.js Documentation,'' \url{https://nodejs.org/en/docs/}, 2024.
+\end{enumerate}
+
+\end{document}

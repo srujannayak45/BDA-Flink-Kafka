@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+**/dist/
+target/
+**/target/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Archives and media exports
+*.zip
+*.mp4
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*.bak
+*.orig
+
+# Tool caches
+.cache/
+**/.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Logs
+logs/
+**/logs/
+*.log
+
+# Docker
+
+# Local project exports
+*.pdf
+*.pptx
+
+# Flink
+**/checkpoints/
+
+# Python
+__pycache__/
+*.pyc
+venv/
